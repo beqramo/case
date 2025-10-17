@@ -44,16 +44,50 @@ export default function HomeScreen() {
   const { isFavorite } = useFavorites();
 
   const loadMealsByCategory = useCallback(async (category: string) => {
-    const mealsData = await api.getMealsByCategory(category);
-    setMeals(mealsData);
+    if (category === 'All') {
+      // For "All", fetch meals from multiple popular categories
+      console.log('📦 Loading meals from all categories...');
+      const popularCategories = [
+        'Beef',
+        'Chicken',
+        'Seafood',
+        'Vegetarian',
+        'Dessert',
+      ];
+      const allMeals: Meal[] = [];
+
+      for (const cat of popularCategories) {
+        const mealsData = await api.getMealsByCategory(cat);
+        allMeals.push(...mealsData.slice(0, 10)); // Get 10 from each
+      }
+
+      setMeals(allMeals);
+    } else {
+      const mealsData = await api.getMealsByCategory(category);
+      setMeals(mealsData);
+    }
     setPage(1);
   }, []);
 
-  const handleSearch = useCallback(async (query: string) => {
-    console.log(`🔍 Search triggered (debounced) for: "${query}"`);
+  const handleSearch = useCallback(async (query: string, category: string) => {
+    console.log(
+      `🔍 Search triggered for: "${query}" in category: "${category}"`,
+    );
     setLoading(true);
     const searchResults = await api.searchMeals(query);
-    setMeals(searchResults);
+
+    // Filter by category if not "All"
+    let filteredResults = searchResults;
+    if (category !== 'All' && searchResults.length > 0) {
+      filteredResults = searchResults.filter(
+        (meal) => meal.strCategory === category,
+      );
+      console.log(
+        `🔍 Filtered ${searchResults.length} results to ${filteredResults.length} for category "${category}"`,
+      );
+    }
+
+    setMeals(filteredResults);
     setPage(1);
     setLoading(false);
   }, []);
@@ -64,16 +98,16 @@ export default function HomeScreen() {
       console.log('🚀 App started - Loading initial data...');
       setLoading(true);
       const categoriesData = await api.getCategories();
-      setCategories(categoriesData);
 
-      if (categoriesData.length > 0) {
-        const firstCategory = categoriesData[0].strCategory;
-        console.log(`🎯 Auto-selecting first category: "${firstCategory}"`);
-        setSelectedCategory(firstCategory);
-        const mealsData = await api.getMealsByCategory(firstCategory);
-        setMeals(mealsData);
-        setPage(1);
-      }
+      // Add "All" as the first category
+      const allCategory: Category = { strCategory: 'All' };
+      const categoriesWithAll = [allCategory, ...categoriesData];
+      setCategories(categoriesWithAll);
+
+      // Select "All" by default
+      console.log('🎯 Auto-selecting "All" category');
+      setSelectedCategory('All');
+      await loadMealsByCategory('All');
 
       setLoading(false);
       console.log('✅ Initial data load complete');
@@ -91,7 +125,7 @@ export default function HomeScreen() {
     if (searchQuery.trim()) {
       setIsSearching(true);
       searchTimeoutRef.current = setTimeout(() => {
-        handleSearch(searchQuery);
+        handleSearch(searchQuery, selectedCategory);
       }, 500);
     } else if (searchQuery === '' && isSearching) {
       // User cleared search, reload the current category
@@ -145,7 +179,7 @@ export default function HomeScreen() {
     setRefreshing(true);
     if (isSearching && searchQuery) {
       console.log(`🔄 Refreshing search results for: "${searchQuery}"`);
-      await handleSearch(searchQuery);
+      await handleSearch(searchQuery, selectedCategory);
     } else if (selectedCategory) {
       console.log(`🔄 Refreshing category: "${selectedCategory}"`);
       await loadMealsByCategory(selectedCategory);
