@@ -99,6 +99,11 @@ initial loading doesn't work anymore, please check
 on renderCategoryChip, when it is a dark mode the font has a wrong color
 ```
 
+```
+when you are doing a search, you need to search inside the selected category.
+and also add all category too so that all products wil lbe visible there.
+```
+
 ## Project Structure
 
 ```
